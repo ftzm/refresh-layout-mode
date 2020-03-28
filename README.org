@@ -1,0 +1,20 @@
+* Refresh Layout Mode
+refresh-layout.el provides a minor mode which automatically refreshes
+the window layout when windows are created or destroyed.  It extends rotate.el.
+** Installation
+I recommend installing the library with use-package and straight.el:
+#+BEGIN_SRC elisp
+(use-package refresh-layout
+  :straight (refresh-layout
+	     :type git
+	     :host github
+	     :repo "ftzm/refresh-layout-mode" )
+  :config
+  (refresh-layout-mode))
+#+END_SRC
+** Configuration
+The default window layout function is the custom `rotate:3column-right-bias`, which will split the frame into up to 3 columns, and accommodates further windows with vertical splits starting from the right-hand side. It is also possible to set the layout to other functions such as those defined in rotate.el as follows:
+#+BEGIN_SRC elisp
+  (setq rotate-current-layout 'rotate:horizontally-n)
+#+END_SRC
+Be sure to use the functions which take a ~num~ argument.
