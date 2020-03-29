@@ -66,8 +66,8 @@ destruction events.")
   "Hook function to disable refresh-layout.  ARGS discarded."
   (setq refresh-layout-disabled t))
 
-(defun enable-refresh-layout ()
-  "Hook function to (re-)enable refresh-layout."
+(defun enable-refresh-layout (&rest args)
+  "Hook function to (re-)enable refresh-layout.  ARGS discarded."
   (setq refresh-layout-disabled nil))
 
 (defun refresh-layout ()
@@ -98,6 +98,10 @@ destruction events.")
   (advice-add 'which-key--show-popup :before 'disable-refresh-layout)
   (advice-add 'which-key--hide-popup :after 'enable-refresh-layout)
 
+  ;; Avoid conflict with persp-mode
+  (advice-add 'persp-restore-window-conf :before 'disable-refresh-layout)
+  (advice-add 'persp-restore-window-conf :after 'enable-refresh-layout)
+
   ;; Avoid conflict with transient (used by magit among others)
   (advice-add 'transient-setup :before 'disable-refresh-layout)
   (add-hook 'post-transient-hook 'enable-refresh-layout)
@@ -113,6 +117,10 @@ destruction events.")
   ;; Avoid conflict with which-key
   (advice-remove 'which-key--show-popup 'disable-refresh-layout)
   (advice-remove 'which-key--hide-popup 'enable-refresh-layout)
+
+  ;; Avoid conflict with persp-mode
+  (advice-remove 'persp-restore-window-conf 'disable-refresh-layout)
+  (advice-remove 'persp-restore-window-conf 'enable-refresh-layout)
 
   ;; Avoid conflict with transient (used by magit among others)
   (advice-remove 'transient-setup 'disable-refresh-layout)
