@@ -33,6 +33,8 @@
 (require 'cl-lib)
 (require 'rotate)
 
+(toggle-debug-on-error)
+
 (defun rotate:3column-right-bias (num)
   "Three column layout with vertical splits biased rightward.
 Reverts to plain tiling when NUM > 9."
@@ -51,7 +53,7 @@ Reverts to plain tiling when NUM > 9."
 
 (setq rotate-current-layout #'rotate:3column-right-bias)
 
-(defvar refresh-layout-disabled nil
+(defvar refresh-layout-disablers (list)
    "Holds the disabled state for temporary suspension.")
 
 (defvar refresh-layout-in-process nil
@@ -62,20 +64,28 @@ Reverts to plain tiling when NUM > 9."
 Doing so allows us to limit refresh actions to window creation or
 destruction events.")
 
-(defun disable-refresh-layout (&rest args)
+(defun disable-refresh-layout (tag)
   "Hook function to disable refresh-layout.  ARGS discarded."
-  (setq refresh-layout-disabled t))
+  (push tag refresh-layout-disablers))
 
-(defun enable-refresh-layout (&rest args)
+(defun enable-refresh-layout (tag)
   "Hook function to (re-)enable refresh-layout.  ARGS discarded."
-  (setq refresh-layout-disabled nil))
+  (setq refresh-layout-disablers (delete* tag refresh-layout-disablers :count 1)))
+
+(defun disable-refresh-layout-around (f &rest args)
+  (if refresh-layout-disabled
+      (apply f args)
+    (progn
+      (setq refresh-layout-disabled t)
+      (apply f args)
+      (setq refresh-layout-disabled nil))))
 
 (defun refresh-layout ()
   "Refresh the window layout if appropriate."
   (let ((current-window-count (length (window-list))))
     (when
       (and
-        (not refresh-layout-disabled)
+       (null refresh-layout-disablers)
         (not (= refresh-layout-window-count current-window-count))
 	    (not refresh-layout-in-process)
 	    (not (active-minibuffer-window))
@@ -87,44 +97,53 @@ destruction events.")
         (rotate:refresh-window rotate-current-layout)
 	(setq refresh-layout-in-process nil)))))
 
+(cl-defun add-refresh-advice (before &key (after nil))
+  (advice-add before :before (lambda (&rest args) (disable-refresh-layout before)))
+  (advice-add (or after before) :after (lambda (&rest args) (enable-refresh-layout before))))
+
+(cl-defun remove-refresh-advice (before &key (after nil))
+  (advice-remove before :before (lambda (&rest args) (disable-refresh-layout before)))
+  (unless before-only (advice-remove (or after before) :after (lambda (&rest args) (enable-refresh-layout before)))))
 
 (defun refresh-layout-setup ()
   "Set up hooks and advice."
+
   ;; Avoid conflict with hydra
-  (advice-add 'lv-message :before 'disable-refresh-layout)
-  (advice-add 'lv-delete-window :after 'enable-refresh-layout)
+  (add-refresh-advice 'lv-message :after 'lv-delete-window)
 
   ;; Avoid conflict with which-key
-  (advice-add 'which-key--show-popup :before 'disable-refresh-layout)
-  (advice-add 'which-key--hide-popup :after 'enable-refresh-layout)
+  (add-refresh-advice 'which-key--show-popup :after 'which-key--hide-popup)
 
   ;; Avoid conflict with persp-mode
-  (advice-add 'persp-restore-window-conf :before 'disable-refresh-layout)
-  (advice-add 'persp-restore-window-conf :after 'enable-refresh-layout)
+  (add-refresh-advice 'persp-restore-window-conf)
 
-  ;; Avoid conflict with transient (used by magit among others)
-  (advice-add 'transient-setup :before 'disable-refresh-layout)
-  (add-hook 'post-transient-hook 'enable-refresh-layout)
+  ;; Avoid conflict with process windows
+  (add-refresh-advice 'window--adjust-process-windows)
+
+  ;; Avoid conflict with transient
+  (advice-add 'transient-setup :before (lambda (&rest args) (disable-refresh-layout 'transient)))
+  (add-hook 'post-transient-hook (lambda (&rest args) (enable-refresh-layout 'transient)))
 
   (add-hook 'window-configuration-change-hook 'refresh-layout))
 
 (defun refresh-layout-teardown ()
   "Remove hooks and advice."
+
   ;; Avoid conflict with hydra
-  (advice-remove 'lv-message 'disable-refresh-layout)
-  (advice-remove 'lv-delete-window 'enable-refresh-layout)
+  (remove-refresh-advice 'lv-message :after 'lv-delete-window)
 
   ;; Avoid conflict with which-key
-  (advice-remove 'which-key--show-popup 'disable-refresh-layout)
-  (advice-remove 'which-key--hide-popup 'enable-refresh-layout)
+  (remove-refresh-advice 'which-key--show-popup :after 'which-key--hide-popup)
 
   ;; Avoid conflict with persp-mode
-  (advice-remove 'persp-restore-window-conf 'disable-refresh-layout)
-  (advice-remove 'persp-restore-window-conf 'enable-refresh-layout)
+  (remove-refresh-advice 'persp-restore-window-conf)
+
+  ;; Avoid conflict with process windows
+  (remove-refresh-advice 'window--adjust-process-windows)
 
   ;; Avoid conflict with transient (used by magit among others)
-  (advice-remove 'transient-setup 'disable-refresh-layout)
-  (remove-hook 'post-transient-hook 'enable-refresh-layout)
+  (advice-remove'transient-setup :before (lambda (&rest args) (disable-refresh-layout 'transient)))
+  (remove-hook 'post-transient-hook (lambda (&rest args) (enable-refresh-layout 'transient)))
 
   (remove-hook 'window-configuration-change-hook 'refresh-layout))
 
@@ -140,4 +159,3 @@ destruction events.")
       (refresh-layout-teardown))))
 
 (provide 'refresh-layout)
-;;; refresh-layout.el ends here
