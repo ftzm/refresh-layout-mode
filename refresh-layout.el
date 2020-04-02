@@ -115,7 +115,7 @@ destruction events.")
   (add-refresh-advice 'which-key--show-popup :after 'which-key--hide-popup)
 
   ;; Avoid conflict with persp-mode
-  (add-refresh-advice 'persp-restore-window-conf)
+  (add-refresh-advice 'persp-switch)
 
   ;; Avoid conflict with process windows
   (add-refresh-advice 'window--adjust-process-windows)
@@ -136,7 +136,7 @@ destruction events.")
   (remove-refresh-advice 'which-key--show-popup :after 'which-key--hide-popup)
 
   ;; Avoid conflict with persp-mode
-  (remove-refresh-advice 'persp-restore-window-conf)
+  (remove-refresh-advice 'persp-switch)
 
   ;; Avoid conflict with process windows
   (remove-refresh-advice 'window--adjust-process-windows)
