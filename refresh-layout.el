@@ -33,7 +33,24 @@
 (require 'cl-lib)
 (require 'rotate)
 
-(toggle-debug-on-error)
+
+;; Override horizontally-n for compatability with olivetti mode
+
+(defun total-window-width ()
+  "Get the total width of the current window, including margins."
+  (apply '+ (list
+	     (window-width)
+	     (or (car (window-margins)) 0)
+	     (or (cdr (window-margins)) 0))))
+
+(defun rotate:horizontally-n (num)
+  (if (<= num 2)
+      (split-window-horizontally)
+    (split-window-horizontally
+     (- (total-window-width) (/ (total-window-width) num)))
+    (rotate:horizontally-n (- num 1))))
+
+;; end override
 
 (defun rotate:3column-right-bias (num)
   "Three column layout with vertical splits biased rightward.
